@@ -12,30 +12,25 @@ class QueryGraph:
         self.entity = query_data.setdefault('entity', list())
         self.intent = query_data.setdefault('entity', 0)
 
-        self.person_relation_list = list()
-        self.init_person_relation_list()
+        self.component_list = list()
+        self.init_relation_component()
 
-        # 以人物关系构造链条
-        self.person_relation_chain = nx.MultiDiGraph()
-        self.init_person_relation_chain()
+        self.disconnected_graph = nx.disjoint_union_all(self.component_list)
 
-    def init_person_relation_list(self):
+        # self.component_list.extend()
+
+    def init_relation_component(self):
         relation_path = os.path.join(os.getcwd(), 'ontology', 'relation.json')
         with open(relation_path, 'r') as fr:
-            relation = json.load(fr)
-
+            relation_data = json.load(fr)
         for r in self.relation:
-            if r['type'] in relation.keys():
-                if relation[r['type']]['domain'] == relation[r['type']]['range'] == 'PERSON':
-                    self.person_relation_list.append(r)
-
-    def init_person_relation_chain(self):
-        for n, r in enumerate(self.person_relation_list):
-            self.person_relation_chain.add_edge('person%d' % n, 'person%d' % (n + 1), r['type'])
-
-        for n in self.person_relation_chain.nodes:
-            self.person_relation_chain.node[n]['label'] = 'concept'
-            self.person_relation_chain.node[n]['type'] = 'PERSON'
+            if r['type'] in relation_data.keys():
+                relation_component = nx.MultiDiGraph()
+                relation_component.add_edge('temp_0', 'temp_1', r['type'], **r)
+                for n in relation_component.nodes:
+                    relation_component.node[n]['label'] = 'concept'
+                    relation_component.node[n]['type'] = 'PERSON'
+                self.component_list.append(relation_component)
 
 
 if __name__ == '__main__':
@@ -47,31 +42,16 @@ if __name__ == '__main__':
                       "value": "父亲",
                       "offset": 3,
                       "code": 0},
+                     {"type": "ParentToChild",
+                      "value": "父亲",
+                      "offset": 3,
+                      "code": 0}
                      ],
         "intent": 0
     }
     qg = QueryGraph(data_dict)
-    gr = qg.person_relation_chain
-    g = Graph(gr)
-    print('=========chain=====')
-    # g.show()
 
-    co = QueryGraphComponent(data_dict['entity'][0], 'person0')
-    c = Graph(co)
-    print('=========component=====')
-    # c.show()
+    g = Graph(qg.disconnected_graph)
+    g.show()
 
-    # t = nx.compose(gr, nx.MultiDiGraph(co))
-    t = nx.compose(gr, co)
-
-    t = Graph(t)
-    t.show()
-
-    t = nx.relabel.relabel_nodes(t, {'person0_name': 'person0'})
-
-    t = Graph(t)
-    t.show()
-
-    # print(qg.relation)
-    # print(qg.entity)
 
