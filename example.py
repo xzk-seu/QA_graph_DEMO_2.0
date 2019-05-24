@@ -1,6 +1,8 @@
 from graph import Graph
 from static_graph import StaticGraph
 import networkx as nx
+import os
+import json
 
 
 # 查询“张三的父亲是谁”
@@ -14,13 +16,12 @@ data_dict = {
     "relation": [{"type": "ParentToChild",
                   "value": "父亲",
                   "offset": 3,
-                  "code": 0}, ],
-    "intent": 0
-}
-
-data_seq = {
-    "seq": [{"isEntity": True, "type": "NAME", "value": "张三", "code": 0},
-            {"isEntity": False, "type": "ParentToChild", "value": "父亲", "offset": 3, "code": 0}],
+                  "code": 0},
+                 {"type": "HusbandToWife",
+                  "value": "妻子",
+                  "offset": 3,
+                  "code": 0},
+                 ],
     "intent": 0
 }
 
@@ -53,7 +54,7 @@ def get_entity_component(entity, temp_name):
 def entity_process(entity, n):
     # print(entity)
     if entity['type'] == 'NAME':
-        temp_name = 'somebody_%d' % n
+        temp_name = 'person_%d' % n
     elif entity['type'] == 'COMPANY':
         temp_name = 'company_%d' % n
     else:
@@ -65,31 +66,35 @@ def entity_process(entity, n):
     t.export('example')
 
 
-def seq_process(seq):
-    # seq = data_seq['seq']
-    for n, item in enumerate(seq):
-        if item['isEntity']:
-            entity_process(item, n)
+def get_person_chain(person_rel_list):
+    person_chain = nx.MultiDiGraph()
+    for n, r in enumerate(person_rel_list):
+        person_chain.add_edge('person%d' % n, 'person%d' % (n+1), r['type'])
+
+    for n in person_chain.nodes:
+        person_chain.node[n]['label'] = 'concept'
+        person_chain.node[n]['type'] = 'PERSON'
+
+    return person_chain
 
 
 def run():
-    entity_list = data_dict['entity']
-    entity_process(entity_list)
+    # entity_list = data_dict['entity']
+    # entity_process(entity_list[0], 0)
+
+    relation_path = os.path.join(os.getcwd(), 'ontology', 'relation.json')
+    with open(relation_path, 'r') as fr:
+        relation = json.load(fr)
+    rels = data_dict['relation']
+    person_rel_list = list()
+    for r in rels:
+        if r['type'] in relation.keys():
+            person_rel_list.append(r)
+
+    p = get_person_chain(person_rel_list)
+    g = Graph(p)
+    g.show()
 
 
 if __name__ == '__main__':
     run()
-
-    # c = get_component("NAME")
-    # t = Graph(graph=c)
-    # t.show()
-    # t = nx.is_frozen(c)
-    # print(t)
-
-    # static_graph = StaticGraph()
-    # # static_graph.show()
-    # # for r in data_dict['relation']:
-    # #     print(r['type'])
-    #
-    # e = static_graph.graph.edges
-    # print(e)

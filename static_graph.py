@@ -30,43 +30,46 @@ def load_data(ontology_dir):
     return dict(object_attribute=object_attribute_list, valued_attribute=valued_attribute_list)
 
 
+# 静态问答图生成
+def graph_generation(ontology_dir):
+    temp_graph = nx.MultiDiGraph()
+    data = load_data(ontology_dir)
+
+    # 导入对象属性边
+    for i in data['object_attribute']:
+        relation_name, label, successor, predecessors = i
+        temp_graph.add_edge(successor, predecessors, label, label=label, type='object', relation_name=relation_name)
+    # 导入值属性边
+    for i in data['valued_attribute']:
+        label, successor, value_type = i
+        predecessors = '%s:%s' % (value_type, label)
+        temp_graph.add_edge(successor, predecessors, label, label=label, type='value')
+
+    # 为节点导入属性
+    for n in temp_graph.nodes:
+        if ':' in n:
+            temp_graph.node[n]['label'] = 'literal'
+        else:
+            temp_graph.node[n]['label'] = 'concept'
+    # 使graph不能再被修改
+    nx.freeze(temp_graph)
+    # self.graph = temp_graph
+    return temp_graph
+
+
 class StaticGraph(Graph):
     def __init__(self, ontology_dir=None, graph=None):
-        Graph.__init__(self, graph=graph)
         if ontology_dir:
-            self.graph_generation(ontology_dir)
+            # 如果指定了本体文件
+            graph = graph_generation(ontology_dir)
+            Graph.__init__(self, graph=graph)
         else:
-            self.load_from_file('static_graph')
-
-    # 静态问答图生成
-    def graph_generation(self, ontology_dir):
-        temp_graph = nx.MultiDiGraph()
-        data = load_data(ontology_dir)
-
-        # 导入对象属性边
-        for i in data['object_attribute']:
-            relation_name, label, successor, predecessors = i
-            temp_graph.add_edge(successor, predecessors, label, label=label, type='object', relation_name=relation_name)
-        # 导入值属性边
-        for i in data['valued_attribute']:
-            label, successor, value_type = i
-            predecessors = '%s:%s' % (value_type, label)
-            temp_graph.add_edge(successor, predecessors, label, label=label, type='value')
-
-        # 为节点导入属性
-        for n in temp_graph.nodes:
-            if ':' in n:
-                temp_graph.node[n]['label'] = 'literal'
-            else:
-                temp_graph.node[n]['label'] = 'concept'
-        # 使graph不能再被修改
-        nx.freeze(temp_graph)
-        self.graph = temp_graph
-        return temp_graph
+            # self.load_from_file('static_graph')
+            Graph.__init__(self, file_name='static_graph')
 
 
 if __name__ == '__main__':
-    static_graph = StaticGraph("ontology")
-    # static_graph = StaticGraph()
+    # static_graph = StaticGraph("ontology")
+    static_graph = StaticGraph()
     static_graph.show()
     static_graph.export('static_graph')
