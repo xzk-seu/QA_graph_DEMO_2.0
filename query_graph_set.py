@@ -21,7 +21,20 @@ class QueryGraph:
         # 得到子图组件构成的集合，用图表示
         self.disconnected_graph = nx.disjoint_union_all(self.relation_component_list+self.entity_component_list)
         self.query_graph = copy.deepcopy(self.disconnected_graph)
+        self.old_query_graph = copy.deepcopy(self.disconnected_graph)
+
+        self.node_type_dict = dict()
+        self.node_type_statistic()
         self.component_assemble()
+
+        while len(self.query_graph.nodes) != len(self.old_query_graph.nodes) \
+                and not nx.algorithms.is_weakly_connected(self.query_graph):
+            # 节点一样多说明上一轮没有合并
+            # 图已连通也不用合并
+            self.old_query_graph = copy.deepcopy(self.query_graph)
+            self.node_type_dict = dict()
+            self.node_type_statistic()
+            self.component_assemble()
         self.add_intention()
 
     def add_intention(self):
@@ -33,16 +46,22 @@ class QueryGraph:
                     self.query_graph.node[n]['intent'] = True
                     break
 
-    def component_assemble(self):
-        # 之后根据依存分析来完善
-        node_type_statistic = dict()
+    """
+    统计每种类型的节点的个数
+    """
+    def node_type_statistic(self):
+        node_type_dict = dict()
         for n in self.query_graph.nodes:
             if self.query_graph.node[n]['label'] == 'concept':
                 node_type = self.query_graph.node[n]['type']
-                if node_type not in node_type_statistic.keys():
-                    node_type_statistic[node_type] = list()
-                node_type_statistic[node_type].append(n)
-        for k, v in node_type_statistic.items():
+                if node_type not in node_type_dict.keys():
+                    node_type_dict[node_type] = list()
+                node_type_dict[node_type].append(n)
+        self.node_type_dict = node_type_dict
+
+    def component_assemble(self):
+        # 之后根据依存分析来完善
+        for k, v in self.node_type_dict.items():
             if len(v) > 2:
                 combinations = itertools.combinations(v, 2)
                 for pair in combinations:
@@ -80,7 +99,8 @@ if __name__ == '__main__':
     data_dict = {
         "entity": [{"type": "NAME",
                     "value": "张三",
-                    "code": 0}, ],
+                    "code": 0},
+                   {"type": "TEL", "value": "139999999999", "code": 0}],
         "relation": [{"type": "ParentToChild",
                       "value": "父亲",
                       "offset": 3,
