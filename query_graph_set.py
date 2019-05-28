@@ -1,7 +1,8 @@
 import networkx as nx
 import json
 import os
-from mylog import logger
+import itertools
+import copy
 from graph import Graph
 from query_graph_component import QueryGraphComponent
 
@@ -10,14 +11,54 @@ class QueryGraph:
     def __init__(self, query_data):
         self.relation = query_data.setdefault('relation', list())
         self.entity = query_data.setdefault('entity', list())
-        self.intent = query_data.setdefault('entity', 0)
+        self.intent = query_data.setdefault('intent', 'PERSON')
 
-        self.component_list = list()
+        self.relation_component_list = list()
+        self.entity_component_list = list()
+        # 获取实体和关系对应的子图组件
         self.init_relation_component()
+        self.init_entity_component()
+        # 得到子图组件构成的集合，用图表示
+        self.disconnected_graph = nx.disjoint_union_all(self.relation_component_list+self.entity_component_list)
+        self.query_graph = copy.deepcopy(self.disconnected_graph)
+        self.component_assemble()
+        self.add_intention()
 
-        self.disconnected_graph = nx.disjoint_union_all(self.component_list)
+    def add_intention(self):
+        # 也需要依存分析,待改进
+        for n in self.query_graph.nodes:
+            if self.query_graph.node[n]['label'] == 'concept':
+                node_type = self.query_graph.node[n]['type']
+                if node_type == self.intent:
+                    self.query_graph.node[n]['intent'] = True
+                    break
 
-        # self.component_list.extend()
+    def component_assemble(self):
+        # 之后根据依存分析来完善
+        node_type_statistic = dict()
+        for n in self.query_graph.nodes:
+            if self.query_graph.node[n]['label'] == 'concept':
+                node_type = self.query_graph.node[n]['type']
+                if node_type not in node_type_statistic.keys():
+                    node_type_statistic[node_type] = list()
+                node_type_statistic[node_type].append(n)
+        for k, v in node_type_statistic.items():
+            if len(v) > 2:
+                combinations = itertools.combinations(v, 2)
+                for pair in combinations:
+                    # 若存在这两条边，则跳过，不存在则合并
+                    if self.query_graph.has_edge(pair[0], pair[1]) or\
+                            self.query_graph.has_edge(pair[1], pair[0]):
+                        continue
+                    else:
+                        mapping = {pair[0]: pair[1]}
+                        nx.relabel_nodes(self.query_graph, mapping, copy=False)
+                        break
+
+    def init_entity_component(self):
+        for e in self.entity:
+            component = QueryGraphComponent(e)
+            self.entity_component_list.append(nx.MultiDiGraph(component))
 
     def init_relation_component(self):
         relation_path = os.path.join(os.getcwd(), 'ontology', 'relation.json')
@@ -29,8 +70,10 @@ class QueryGraph:
                 relation_component.add_edge('temp_0', 'temp_1', r['type'], **r)
                 for n in relation_component.nodes:
                     relation_component.node[n]['label'] = 'concept'
-                    relation_component.node[n]['type'] = 'PERSON'
-                self.component_list.append(relation_component)
+
+                relation_component.node['temp_0']['type'] = relation_data[r['type']]['domain']
+                relation_component.node['temp_1']['type'] = relation_data[r['type']]['range']
+                self.relation_component_list.append(relation_component)
 
 
 if __name__ == '__main__':
@@ -42,16 +85,13 @@ if __name__ == '__main__':
                       "value": "父亲",
                       "offset": 3,
                       "code": 0},
-                     {"type": "ParentToChild",
-                      "value": "父亲",
-                      "offset": 3,
-                      "code": 0}
                      ],
-        "intent": 0
+        "intent": 'PERSON'
     }
     qg = QueryGraph(data_dict)
 
-    g = Graph(qg.disconnected_graph)
+    g = Graph(qg.query_graph)
     g.show()
+    g.export('query_graph')
 
 

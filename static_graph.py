@@ -1,9 +1,7 @@
 import networkx as nx
-import json
 import csv
 import os
 from graph import Graph
-from mylog import logger
 
 
 # 从ontology文件夹导入数据

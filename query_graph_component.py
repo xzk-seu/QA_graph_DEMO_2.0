@@ -13,7 +13,8 @@ class QueryGraphComponent(Graph):
             self.node['p']['label'] = 'concept'
             self.node['p']['type'] = 'PERSON'
             self.node['p_name']['label'] = 'literal'
-            self.node['p_name']['value'] = entity['value']
+            self.node['p_name']['type'] = 'string'
+            self.node['p_name']['entity'] = entity
 
 
 if __name__ == '__main__':
